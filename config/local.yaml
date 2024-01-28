@@ -1,0 +1,10 @@
+env: "local"
+storage_path: "../../storage/storage.db"
+http_server:
+  address: "localhost:8085"
+  read_timeout: 4s
+  write_timeout: 5s
+  idle_timeout: 60s
+  user: "admin"
+  password: "123"
+  aliasLength: 6
