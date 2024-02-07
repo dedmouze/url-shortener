@@ -14,6 +14,7 @@ type Storage struct {
 	db *sql.DB
 }
 
+// New creates new instance of the SQLite storage
 func New(storagePath string) (*Storage, error) {
 	const op = "storage.sqlite.New"
 
@@ -41,6 +42,7 @@ func New(storagePath string) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
+// SaveURL saves URL and alias to db
 func (s *Storage) SaveURL(urlToSave string, alias string) error {
 	const op = "storage.sqlite.SaveURL"
 
@@ -51,7 +53,8 @@ func (s *Storage) SaveURL(urlToSave string, alias string) error {
 
 	_, err = stmt.Exec(urlToSave, alias)
 	if err != nil {
-		if sqliteErr, ok := err.(sqlite3.Error); ok && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+		var sqliteErr sqlite3.Error
+		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
 			return fmt.Errorf("%s: %w", op, storage.ErrURLExists)
 		}
 		return fmt.Errorf("%s: %w", op, err)
@@ -60,6 +63,7 @@ func (s *Storage) SaveURL(urlToSave string, alias string) error {
 	return nil
 }
 
+// GetURL gets URL by alias from db
 func (s *Storage) GetURL(alias string) (string, error) {
 	const op = "storage.sqlite.GetURL"
 
@@ -80,6 +84,7 @@ func (s *Storage) GetURL(alias string) (string, error) {
 	return resURL, nil
 }
 
+// DeleteURL deletes URL by alias from db
 func (s *Storage) DeleteURL(alias string) error {
 	const op = "storage.sqlite.DeleteURL"
 

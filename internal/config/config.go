@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"log"
 	"os"
 	"time"
@@ -9,8 +10,10 @@ import (
 )
 
 type Config struct {
-	Env         string `yaml:"env" env_default:"local"`
-	StoragePath string `yaml:"storage_path" env-required:"true"`
+	Env         string        `yaml:"env" env_default:"local"`
+	StoragePath string        `yaml:"storage_path" env-required:"true"`
+	Clients     ClientsConfig `yaml:"clients"`
+	AppSecret   string        `yaml:"app_secret"`
 	HTTPServer  `yaml:"http_server"`
 }
 
@@ -24,14 +27,22 @@ type HTTPServer struct {
 	IdleTimeout  time.Duration `yaml:"idle_timeout" env-default:"60s"`
 }
 
+type Client struct {
+	Address      string        `yaml:"address"`
+	Timeout      time.Duration `yaml:"timeout"`
+	RetriesCount int           `yaml:"retries_count"`
+	Insecure     bool          `yaml:"insecure" env-default:"false"`
+}
+
+type ClientsConfig struct {
+	SSO Client `yaml:"sso"`
+}
+
 func MustLoad() *Config {
 	// Указываем путь к конфигу
-	var configPath string
-	for i, v := range os.Args {
-		if v == "--config" {
-			configPath = os.Args[i+1]
-			break
-		}
+	configPath := fetchConfigPath()
+	if configPath == "" {
+		log.Fatal("Config path is empty")
 	}
 
 	// Получаем информацию о файле
@@ -46,4 +57,17 @@ func MustLoad() *Config {
 	}
 
 	return &cfg
+}
+
+func fetchConfigPath() string {
+	var configPath string
+
+	flag.StringVar(&configPath, "config", "", "path to config file")
+	flag.Parse()
+
+	if configPath == "" {
+		configPath = os.Getenv("CONFIG_PATH")
+	}
+
+	return configPath
 }

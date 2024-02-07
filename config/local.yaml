@@ -1,5 +1,6 @@
 env: "local"
-storage_path: "../../storage/storage.db"
+storage_path: "./storage/storage.db"
+app_secret: "asdfghjkl;"
 http_server:
   address: "localhost:8085"
   read_timeout: 4s
@@ -8,3 +9,8 @@ http_server:
   user: "admin"
   password: "123"
   aliasLength: 6
+clients:
+  sso:
+    address: "localhost:8088"
+    timeout: "5s"
+    retries_count: 5
