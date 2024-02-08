@@ -19,8 +19,6 @@ type Config struct {
 
 type HTTPServer struct {
 	Address      string        `yaml:"address" env-default:"localhost:8085"`
-	User         string        `yaml:"user" env-required:"true"`
-	Password     string        `yaml:"password" env-required:"true" env:"HTTP_SERVER_PASSWORD"`
 	AliasLength  int           `yaml:"aliasLength" env-default:"6"`
 	ReadTimeout  time.Duration `yaml:"read_timeout" env-default:"5s"`
 	WriteTimeout time.Duration `yaml:"write_timeout" env-default:"5s"`

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"url-shortener/internal/http-server/handlers/redirect"
 	"url-shortener/internal/http-server/handlers/url/delete"
 	"url-shortener/internal/http-server/handlers/url/save"
+	"url-shortener/internal/http-server/middleware/auth"
 	"url-shortener/internal/http-server/middleware/logger"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
 	"url-shortener/internal/lib/logger/sl"
@@ -34,16 +34,17 @@ func main() {
 	log.Info("starting url-shortener", slog.String("env", cfg.Env), slog.String("version", "1"))
 	log.Debug("debug messages are enabled")
 
-	ssoClient, _ := ssogrpc.New(
+	ssoClient, err := ssogrpc.New(
 		context.Background(),
 		log,
 		cfg.Clients.SSO.Address,
 		cfg.Clients.SSO.Timeout,
 		cfg.Clients.SSO.RetriesCount,
 	)
-
-	fmt.Println(ssoClient.IsAdmin(context.Background(), 1)) // Example of SSO invoking
-	fmt.Println(ssoClient.IsAdmin(context.Background(), 2))
+	if err != nil {
+		log.Error("")
+		os.Exit(1)
+	}
 
 	storage, err := sqlite.New(cfg.StoragePath)
 	if err != nil {
@@ -54,17 +55,12 @@ func main() {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(logger.New(log))
+	router.Use(auth.New(log, cfg.AppSecret, ssoClient))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	router.Route("/url", func(r chi.Router) {
-		r.Use(middleware.BasicAuth("url-shortener", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Post("/", save.New(log, storage, cfg))
-		r.Delete("/{alias}", delete.New(log, storage))
-	})
-
+	router.Post("/", save.New(log, storage, cfg))
+	router.Delete("/{alias}", delete.New(log, storage))
 	router.Get("/{alias}", redirect.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))

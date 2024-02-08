@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"url-shortener/internal/http-server/middleware/auth"
 	"url-shortener/internal/lib/api/response"
 	"url-shortener/internal/lib/logger/sl"
 	"url-shortener/internal/storage"
@@ -27,6 +28,19 @@ func New(log *slog.Logger, urldeleter URLDeleter) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		isAdmin, ok := auth.IsAdminFromContext(r.Context())
+		if !ok {
+			log.Error("failed to convert")
+			render.JSON(w, r, response.Error("failed to convert"))
+			return
+		}
+
+		if !isAdmin {
+			log.Warn("user not admin")
+			render.JSON(w, r, response.Error("don't have permission to delete"))
+			return
+		}
 
 		alias := chi.URLParam(r, "alias")
 		if alias == "" {

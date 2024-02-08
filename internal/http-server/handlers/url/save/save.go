@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	"url-shortener/internal/config"
+	"url-shortener/internal/http-server/middleware/auth"
 	"url-shortener/internal/lib/api/response"
 	"url-shortener/internal/lib/logger/sl"
 	"url-shortener/internal/lib/random"
@@ -40,6 +41,19 @@ func New(log *slog.Logger, urlSaver URLSaver, cfg *config.Config) http.HandlerFu
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		isAdmin, ok := auth.IsAdminFromContext(r.Context())
+		if !ok {
+			log.Error("failed to convert")
+			render.JSON(w, r, response.Error("failed to convert"))
+			return
+		}
+
+		if !isAdmin {
+			log.Warn("user not admin")
+			render.JSON(w, r, response.Error("don't have permission to save"))
+			return
+		}
 
 		var req Request
 		err := render.DecodeJSON(r.Body, &req)
