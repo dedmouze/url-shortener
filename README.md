@@ -2,11 +2,54 @@
 
 ---
 
-## Сервис предоставляет 3 эндпоинта
+## Структура проекта
+
+.
+├───.github
+│   └───workflow
+├───cmd
+│   ├───migrator
+│   └───url-shortener
+├───config
+├───domain
+│   └───models
+├───internal
+│   ├───clients
+│   │   └───sso
+│   │       └───grpc
+│   ├───config
+│   ├───http-server
+│   │   ├───handlers
+│   │   │   ├───redirect
+│   │   │   │   └───mocks
+│   │   │   └───url
+│   │   │       ├───delete
+│   │   │       │   └───mocks
+│   │   │       └───save
+│   │   │           └───mocks
+│   │   └───middleware
+│   │       ├───auth
+│   │       └───logger
+│   ├───lib
+│   │   ├───api
+│   │   │   └───response
+│   │   ├───jwt
+│   │   ├───logger
+│   │   │   ├───handlers
+│   │   │   │   ├───slogdiscard
+│   │   │   │   └───slogpretty
+│   │   │   └───sl
+│   │   └───random
+│   └───storage
+│       └───sqlite
+├───migrations
+└───storage
 
 Для работы сервиса необходима авторизация в сервисе [SSO](https://github.com/dedmouze/sso)
 
 ___
+
+## Сервис предоставляет 3 эндпоинта
 
 ### SaveURL: host/url
 
