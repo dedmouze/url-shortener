@@ -2,9 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -31,20 +36,8 @@ func main() {
 	cfg := config.MustLoad()
 	log := setupLogger(cfg.Env)
 
-	log.Info("starting url-shortener", slog.String("env", cfg.Env), slog.String("version", "1"))
+	log.Info(fmt.Sprintf("starting %s", cfg.AppName), slog.String("env", cfg.Env), slog.String("version", "1"))
 	log.Debug("debug messages are enabled")
-
-	ssoClient, err := ssogrpc.New(
-		context.Background(),
-		log,
-		cfg.Clients.SSO.Address,
-		cfg.Clients.SSO.Timeout,
-		cfg.Clients.SSO.RetriesCount,
-	)
-	if err != nil {
-		log.Error("")
-		os.Exit(1)
-	}
 
 	storage, err := sqlite.New(cfg.StoragePath)
 	if err != nil {
@@ -52,10 +45,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	ssoClient, err := ssogrpc.New(
+		context.Background(),
+		log,
+		cfg.Clients.SSO.Address,
+		cfg.Clients.SSO.Timeout,
+		cfg.Clients.SSO.RetriesCount,
+		cfg.AppName,
+		storage,
+		storage,
+	)
+	if err != nil {
+		log.Error("internal error, exits the application", sl.Err(err))
+		os.Exit(1)
+	}
+	cfg.UserKey = ssoClient.UserKey
+
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(logger.New(log))
-	router.Use(auth.New(log, cfg.AppSecret, ssoClient))
+	router.Use(auth.New(log, cfg.UserKey, ssoClient))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
@@ -64,6 +73,10 @@ func main() {
 	router.Get("/{alias}", redirect.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
 	server := &http.Server{
 		Addr:         cfg.Address,
 		Handler:      router,
@@ -72,10 +85,34 @@ func main() {
 		IdleTimeout:  cfg.IdleTimeout,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Error("failed to start server")
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				log.Info("shutting server", sl.Err(err))
+				return
+			}
+			log.Error("failed to start server", sl.Err(err))
+		}
+	}()
+
+	log.Info("server started")
+	sign := <-done
+	log.Info("stopping server", slog.String("signal", sign.String()))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Error("failed to stop server", sl.Err(err))
+		return
 	}
-	log.Error("server stopped")
+
+	if err := storage.Close(); err != nil {
+		log.Error("failed to close database", sl.Err(err))
+		return
+	}
+
+	log.Info("server stopped")
 }
 
 func setupLogger(env string) *slog.Logger {

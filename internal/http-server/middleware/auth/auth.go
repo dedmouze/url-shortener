@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,25 +13,26 @@ import (
 )
 
 var (
-	ErrInvalidToken       = errors.New("invalid token")
-	ErrFailedIsAdminCheck = errors.New("failed to check if user is admin")
+	ErrInvalidToken     = errors.New("invalid token")
+	ErrConvert          = errors.New("failed to convert")
+	ErrPermissionDenied = errors.New("don't have permission to action")
+	ErrFailedAdminCheck = errors.New("failed to check if user is admin")
 )
 
 type Key string
 
 var (
 	authErrorKey = Key("authError")
-	uIDKey       = Key("uid")
 	isAdminKey   = Key("isAdmin")
 )
 
 type PermissionProvider interface {
-	IsAdmin(ctx context.Context, userID int64) (bool, error)
+	IsAdmin(ctx context.Context, email string) (bool, error)
 }
 
 func New(
 	log *slog.Logger,
-	appSecret string,
+	userKey string,
 	permProvider PermissionProvider,
 ) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -47,7 +49,7 @@ func New(
 				return
 			}
 
-			token, err := jwt.Parse(jwtToken, appSecret)
+			token, err := jwt.Parse(jwtToken, userKey)
 			if err != nil {
 				log.Warn("failed to parse token", sl.Err(err))
 
@@ -61,24 +63,24 @@ func New(
 				slog.Int64("UID", token.UID),
 				slog.String("Email", token.Email),
 				slog.String("Expiration", token.Expiration.Format("15:05:05.000")),
-				slog.Int64("AppID", token.AppID),
+				slog.Bool("Is admin", token.Level > 1),
 			)
 
-			entry.Info("user authorized")
-
-			isAdmin, err := permProvider.IsAdmin(r.Context(), token.UID)
+			isAdmin, err := permProvider.IsAdmin(r.Context(), token.Email)
 			if err != nil {
 				log.Error("failed to check if user is admin", sl.Err(err))
 
-				ctx := context.WithValue(r.Context(), authErrorKey, ErrFailedIsAdminCheck)
+				ctx := context.WithValue(r.Context(), authErrorKey, true)
+				ctx = context.WithValue(ctx, isAdminKey, false)
 				next.ServeHTTP(w, r.WithContext(ctx))
 
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), uIDKey, token.UID)
-			ctx = context.WithValue(ctx, isAdminKey, isAdmin)
+			entry.Info("user authorized")
 
+			ctx := context.WithValue(r.Context(), isAdminKey, isAdmin)
+			ctx = context.WithValue(ctx, authErrorKey, false)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 
@@ -86,19 +88,25 @@ func New(
 	}
 }
 
-func UIDFromContext(ctx context.Context) (int64, bool) {
-	uid, ok := ctx.Value(uIDKey).(int64)
-	return uid, ok
-}
+func CheckPermission(ctx context.Context) error {
+	const op = "middleware.auth.CheckPermission"
 
-func ErrorFromContext(ctx context.Context) (error, bool) {
-	err, ok := ctx.Value(authErrorKey).(error)
-	return err, ok
-}
-
-func IsAdminFromContext(ctx context.Context) (bool, bool) {
 	isAdmin, ok := ctx.Value(isAdminKey).(bool)
-	return isAdmin, ok
+	if !ok {
+		return fmt.Errorf("%s: %w", op, ErrConvert)
+	}
+	if !isAdmin {
+		isErr, ok := ctx.Value(authErrorKey).(bool)
+		if !ok {
+			return fmt.Errorf("%s: %w", op, ErrConvert)
+		}
+		if isErr {
+			return fmt.Errorf("%s: %w", op, ErrFailedAdminCheck)
+		}
+		return fmt.Errorf("%s: %w", op, ErrPermissionDenied)
+	}
+
+	return nil
 }
 
 func extractBearerToken(r *http.Request) string {

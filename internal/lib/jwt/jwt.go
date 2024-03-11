@@ -11,7 +11,7 @@ type Token struct {
 	UID        int64
 	Email      string
 	Expiration time.Time
-	AppID      int64
+	Level      int8
 }
 
 func Parse(raw, appSecret string) (*Token, error) {
@@ -29,7 +29,7 @@ func Parse(raw, appSecret string) (*Token, error) {
 		UID:        int64(claims["uid"].(float64)),
 		Email:      claims["email"].(string),
 		Expiration: time.Unix(int64(claims["exp"].(float64)), 0),
-		AppID:      int64(claims["app_id"].(float64)),
+		Level:      int8(claims["level"].(float64)),
 	}
 
 	return token, nil

@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
+	AppName     string        `yaml:"app_name" env_default:"url-shortener"`
 	Env         string        `yaml:"env" env_default:"local"`
 	StoragePath string        `yaml:"storage_path" env-required:"true"`
 	Clients     ClientsConfig `yaml:"clients"`
-	AppSecret   string        `yaml:"app_secret"`
+	UserKey     string        `yaml:"user_key"`
 	HTTPServer  `yaml:"http_server"`
 }
 

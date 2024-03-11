@@ -29,16 +29,24 @@ func New(log *slog.Logger, urldeleter URLDeleter) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		isAdmin, ok := auth.IsAdminFromContext(r.Context())
-		if !ok {
-			log.Error("failed to convert")
-			render.JSON(w, r, response.Error("failed to convert"))
-			return
-		}
-
-		if !isAdmin {
-			log.Warn("user not admin")
-			render.JSON(w, r, response.Error("don't have permission to delete"))
+		err := auth.CheckPermission(r.Context())
+		if err != nil {
+			if errors.Is(err, auth.ErrConvert) {
+				log.Error("failed to convert", sl.Err(err))
+				render.JSON(w, r, response.Error("failed to convert token"))
+			} else if errors.Is(err, auth.ErrFailedAdminCheck) {
+				log.Error("failed to check if user is admin", sl.Err(err))
+				render.JSON(w, r, response.Error("failed to check if user is admin"))
+			} else if errors.Is(err, auth.ErrInvalidToken) {
+				log.Error("invalid token", sl.Err(err))
+				render.JSON(w, r, response.Error("invalid token"))
+			} else if errors.Is(err, auth.ErrPermissionDenied) {
+				log.Error("don't have permission to action", sl.Err(err))
+				render.JSON(w, r, response.Error("don't have permission to action"))
+			} else {
+				log.Error("internal error", sl.Err(err))
+				render.JSON(w, r, response.Error("internal error"))
+			}
 			return
 		}
 
@@ -49,7 +57,7 @@ func New(log *slog.Logger, urldeleter URLDeleter) http.HandlerFunc {
 			return
 		}
 
-		err := urldeleter.DeleteURL(alias)
+		err = urldeleter.DeleteURL(alias)
 		if err != nil {
 			if errors.Is(err, storage.ErrURLNotFound) {
 				log.Info("url not found")

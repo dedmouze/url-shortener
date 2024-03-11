@@ -1,6 +1,6 @@
 env: "local"
 storage_path: "./storage/storage.db"
-app_secret: "t-secret"
+app_name: "url-shortener"
 http_server:
   address: "localhost:8085"
   read_timeout: 4s
