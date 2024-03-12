@@ -54,7 +54,7 @@ ___
 
 ## Сервис предоставляет 3 эндпоинта
 
-### SaveURL: host/url
+### SaveURL: host/
 
 #### Request:
 ```json
@@ -75,8 +75,8 @@ ___
 
 #### Возможные HTTP запросы:
 ```batch
-curl --location 'localhost:8085/url' --header 'Content-Type: application/json' --header 'Authorization: Basic XXXXXXXXXXXX' --data '{"url":"https://yandex.ru", "alias":"ya"}'
-curl --location 'localhost:8085/url' --header 'Content-Type: application/json' --header 'Authorization: Basic XXXXXXXXXXXX' --data '{"url":"https://mail.ru"}'
+curl --location 'localhost:8085/' --header 'Content-Type: application/json' --header 'Authorization: Bearer XXXXXXXXXXXX' --data '{"url":"https://yandex.ru", "alias":"ya"}'
+curl --location 'localhost:8085/' --header 'Content-Type: application/json' --header 'Authorization: Bearer XXXXXXXXXXXX' --data '{"url":"https://mail.ru"}'
 ```
 
 ---
@@ -96,10 +96,10 @@ curl --location 'localhost:8085/ya'
 
 ---
 
-### DeleteURL: host/url/'alias'
+### DeleteURL: host/'alias'
 #### Возможный HTTP запрос:
 ```batch
-curl --location --request DELETE 'localhost:8085/url/ya' --header 'Authorization: Basic XXXXXXXXXXXX'
+curl --location --request DELETE 'localhost:8085/ya' --header 'Authorization: Bearer XXXXXXXXXXXX'
 ```
 #### Response:
 ```json
